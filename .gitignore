@@ -1,0 +1,5 @@
+venv
+.idea
+id.txt
+token.txt
+test1.py
