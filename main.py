@@ -1,4 +1,6 @@
 import requests
+import time
+from progress.bar import IncrementalBar
 from pprint import pprint
 
 
@@ -55,15 +57,21 @@ class YaUploader:
 
     def upload(self):
         upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
-        url_photos = vk.get_photo()
+        url_photo = vk.get_photo()
         headers = self.get_headers()
-        for file_name, file_path in url_photos.items():
+        bar = IncrementalBar('Countdown', max=len(url_photo))
+        # print(len(url_photo))
+        # return 'done'
+        for file_name, file_path in url_photo.items():
             params = {"path": f"photo/{file_name}.jpg", "url": f"{file_path}", "overwrite": "true"}
             response = requests.post(upload_url, headers=headers, params=params)
             response.raise_for_status()
-            print(response.status_code)
-            if response.status_code == 202:
-                print('Status: OK')
+            # print(response.status_code)
+            # if response.status_code == 202:
+            #     print('Status: OK')
+            bar.next()
+            time.sleep(1)
+        bar.finish()
         return 'Done'
 
 
@@ -74,17 +82,20 @@ def get_token_id_from_file(file_name):
 
 
 def get_access():
-    access_key = {}
-    access_key['access_token'] = get_token_id_from_file('token')
-    access_key['user_id'] = get_token_id_from_file('id')
-    access_key['ya_token'] = get_token_id_from_file('yatoken')
-    return access_key
+    get_access_key = {
+        'access_token': get_token_id_from_file('token'),
+        'user_id': get_token_id_from_file('id'),
+        'ya_token': get_token_id_from_file('yatoken')
+    }
+    return get_access_key
 
 
 if __name__ == '__main__':
     access_key = get_access()
+    # print(access_key)
     vk = VK(access_key['access_token'], access_key['user_id'])
     user = vk.users_info()
+    # print(user)
     print(f"User: {user['response'][0]['first_name']} {user['response'][0]['last_name']}")
     uploader = YaUploader(access_key['ya_token'])
     result = uploader.upload()
