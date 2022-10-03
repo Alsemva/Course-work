@@ -1,6 +1,6 @@
 import requests
 import time
-from progress.bar import IncrementalBar
+from tqdm import tqdm
 from pprint import pprint
 
 
@@ -59,20 +59,20 @@ class YaUploader:
         upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
         url_photo = vk.get_photo()
         headers = self.get_headers()
-        bar = IncrementalBar('Countdown', max=len(url_photo))
+        # bar = IncrementalBar('Upload', max=len(url_photo))
         # print(len(url_photo))
         # return 'done'
-        for file_name, file_path in url_photo.items():
+        for file_name, file_path in tqdm(url_photo.items()):
             params = {"path": f"photo/{file_name}.jpg", "url": f"{file_path}", "overwrite": "true"}
             response = requests.post(upload_url, headers=headers, params=params)
             response.raise_for_status()
             # print(response.status_code)
             # if response.status_code == 202:
             #     print('Status: OK')
-            bar.next()
+            # bar.next()
             time.sleep(1)
-        bar.finish()
-        return 'Done'
+        # bar.finish()
+        return '\n Done'
 
 
 def get_token_id_from_file(file_name):
