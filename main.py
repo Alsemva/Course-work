@@ -41,10 +41,7 @@ class VK:
         response = requests.get(url, params={**self.params, **params})
         response.raise_for_status()
         temp = response.json()
-        # Работаем дальше
-        # pprint((temp['response']['items']['sizes']))
-        pprint(self._choose_photo_max_size(temp))
-        return response.json()
+        return self._choose_photo_max_size(temp)
 
 
 class YaUploader:
@@ -56,51 +53,17 @@ class YaUploader:
             'Authorization': f'OAuth {self.token}'
         }
 
-    # def _get_upload_url(self, file_name, file_path):
-    #     upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
-    #     headers = self.get_headers()
-    #     print(file_name)
-    #     print(file_path)
-    #     params = {"path": file_name, "overwrite": "true"}
-    #     response = requests.get(upload_url, headers=headers, params=params)
-    #     response.raise_for_status()
-    #     return response.json()
-
-    def upload(self, file_path):
+    def upload(self):
         upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
-        file_name = 'file/500.jpg'
+        url_photos = vk.get_photo()
         headers = self.get_headers()
-        params = {"path": file_name, "url": file_path, "overwrite": "true"}
-        # response_dict = self._get_upload_url(file_name, file_path)
-        # upload_files_url = response_dict.get("href", "")
-        response = requests.post(upload_url, headers=headers, params=params)
-        response.raise_for_status()
-        print(response.status_code)
-        if response.status_code == 201:
-            print('Status: OK')
-        # url_file = f'{file_name}'
-        #
-        # r = requests.get(url_file)
-        # print(type(r))
-        # with open(fr'{file_name}', 'rb') as file:
-        #     response = requests.put(upload_files_url, files={"file": file})
-        #     response.raise_for_status()
-        #     if response.status_code == 201:
-        #         print('Status: OK')
-        #
-        # with open(r, 'wb') as file:
-        #     response = requests.put(upload_files_url, files={"file": file})
-        #     response.raise_for_status()
-        #     if response.status_code == 201:
-        #         print('Status: OK')
-        # for file_path in file_list:
-        #     response_dict = self._get_upload_url(f'{path_to_dir}/{file_path}')
-        #     upload_files_url = response_dict.get("href", "")
-        #     with open(f'{path_to_dir}/{file_path}', 'rb') as file:
-        #         response = requests.put(upload_files_url, files={"file": file})
-        #         response.raise_for_status()
-        #         if response.status_code == 201:
-        #             print('Status: OK')
+        for file_name, file_path in url_photos.items():
+            params = {"path": f"photo/{file_name}.jpg", "url": f"{file_path}", "overwrite": "true"}
+            response = requests.post(upload_url, headers=headers, params=params)
+            response.raise_for_status()
+            print(response.status_code)
+            if response.status_code == 202:
+                print('Status: OK')
         return 'Done'
 
 
@@ -110,15 +73,19 @@ def get_token_id_from_file(file_name):
     return token_id
 
 
+def get_access():
+    access_key = {}
+    access_key['access_token'] = get_token_id_from_file('token')
+    access_key['user_id'] = get_token_id_from_file('id')
+    access_key['ya_token'] = get_token_id_from_file('yatoken')
+    return access_key
+
+
 if __name__ == '__main__':
-    access_token = get_token_id_from_file('token')
-    user_id = get_token_id_from_file('id')
-    ya_token = get_token_id_from_file('yatoken')
-    vk = VK(access_token, user_id)
-    print(vk.users_info())
-    pprint(vk.get_photo())
-    # path_to_dir = 'files'
-    path_to_file = 'https://sun9-east.userapi.com/sun9-60/s/v1/if2/aLgdB2AbtzK6TLR7R5f_TKo14ZPqicKcJfEGqD-1gxqqR2wo418cH3uaxa5lFs66zszvqW9qGh0ksyXmd_RJRDVY.jpg?size=1536x2048&quality=96&type=album'
-    uploader = YaUploader(ya_token)
-    result = uploader.upload(path_to_file)
+    access_key = get_access()
+    vk = VK(access_key['access_token'], access_key['user_id'])
+    user = vk.users_info()
+    print(f"User: {user['response'][0]['first_name']} {user['response'][0]['last_name']}")
+    uploader = YaUploader(access_key['ya_token'])
+    result = uploader.upload()
     print(result)
