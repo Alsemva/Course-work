@@ -21,21 +21,20 @@ class VK:
         response.raise_for_status()
         return response.json()
 
-    def _max_size(self, item):
+    def _max_size(self, item, name):
         letters = ['w', 'z', 'y', 'r', 'q', 'p', 'o', 'x', 'm', 's']
         for letter in letters:
             for characteristic in item:
                 if letter == characteristic['type']:
-                    return characteristic['url']
+                    return {'size': characteristic['type'], 'name': name, 'url': characteristic['url']}
 
     def _choose_photo_max_size(self, response):
-        """"При совпадении лайков у фото, добавляется +1 лайк"""
-        max_photo_size_dict = {}
+        # max_photo_size_dict = {}
+        max_photo_size_list = []
         for item in response['response']['items']:
-            if item['likes']['count'] in max_photo_size_dict:
-                item['likes']['count'] += 1
-            max_photo_size_dict[item['likes']['count']] = self._max_size(item['sizes'])
-        return max_photo_size_dict
+            # max_photo_size_dict[item['likes']['count']] = self._max_size(item['sizes'])
+            max_photo_size_list.append(self._max_size(item['sizes'], item['likes']['count']))
+        return max_photo_size_list
 
     def get_photo(self):
         url = 'https://api.vk.com/method/photos.get'
@@ -55,23 +54,42 @@ class YaUploader:
             'Authorization': f'OAuth {self.token}'
         }
 
-    def upload(self):
+    def mk_dir(self, path):
+        mk_dir_url = "https://cloud-api.yandex.net/v1/disk/resources"
+        params = path
+        headers = self.get_headers()
+        response = requests.get(mk_dir_url, headers=headers, params=params)
+        if response.status_code != 200:
+            print("Directory created")
+            response = requests.put(mk_dir_url, headers=headers, params=params)
+        else:
+            print("Directory exists")
+        return response
+
+    def upload(self, id_user):
         upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
         url_photo = vk.get_photo()
         headers = self.get_headers()
+        path = {"path": f"photo_{id_user}"}
+        self.mk_dir(path).raise_for_status()
         # bar = IncrementalBar('Upload', max=len(url_photo))
         # print(len(url_photo))
         # return 'done'
-        for file_name, file_path in tqdm(url_photo.items()):
-            params = {"path": f"photo/{file_name}.jpg", "url": f"{file_path}", "overwrite": "true"}
+        for item in tqdm(url_photo):
+            params = {"path": f"{path['path']}/{item['name']}.jpg", "url": f"{item['url']}"}
             response = requests.post(upload_url, headers=headers, params=params)
             response.raise_for_status()
-            # print(response.status_code)
-            # if response.status_code == 202:
-            #     print('Status: OK')
-            # bar.next()
             time.sleep(1)
-        # bar.finish()
+        # for file_name, file_path in tqdm(url_photo.items()):
+        #     params = {"path": f"photo/{file_name}.jpg", "url": f"{file_path}", "overwrite": "true"}
+        #     response = requests.post(upload_url, headers=headers, params=params)
+        #     response.raise_for_status()
+        #     # print(response.status_code)
+        #     # if response.status_code == 202:
+        #     #     print('Status: OK')
+        #     # bar.next()
+        #     time.sleep(1)
+        # # bar.finish()
         return '\n Done'
 
 
@@ -98,5 +116,5 @@ if __name__ == '__main__':
     # print(user)
     print(f"User: {user['response'][0]['first_name']} {user['response'][0]['last_name']}")
     uploader = YaUploader(access_key['ya_token'])
-    result = uploader.upload()
+    result = uploader.upload(access_key['user_id'])
     print(result)
