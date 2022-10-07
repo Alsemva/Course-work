@@ -1,6 +1,7 @@
 import requests
 import time
 from tqdm import tqdm
+import json
 from pprint import pprint
 
 
@@ -29,10 +30,8 @@ class VK:
                     return {'size': characteristic['type'], 'name': name, 'url': characteristic['url']}
 
     def _choose_photo_max_size(self, response):
-        # max_photo_size_dict = {}
         max_photo_size_list = []
         for item in response['response']['items']:
-            # max_photo_size_dict[item['likes']['count']] = self._max_size(item['sizes'])
             max_photo_size_list.append(self._max_size(item['sizes'], item['likes']['count']))
         return max_photo_size_list
 
@@ -46,8 +45,10 @@ class VK:
 
 
 class YaUploader:
-    def __init__(self, token: str):
+    def __init__(self, token: str, number_of_photos):
         self.token = token
+        self.upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
+        self.number_of_photos = number_of_photos
 
     def get_headers(self):
         return {
@@ -55,6 +56,7 @@ class YaUploader:
         }
 
     def mk_dir(self, path):
+        """creating a directory on yandex.disk"""
         mk_dir_url = "https://cloud-api.yandex.net/v1/disk/resources"
         params = path
         headers = self.get_headers()
@@ -66,30 +68,45 @@ class YaUploader:
             print("Directory exists")
         return response
 
+    def _get_upload_url(self, path):
+        params = {"path": f'{path["path"]}/info.json', "overwrite": "true"}
+        headers = self.get_headers()
+        response = requests.get(self.upload_url, headers=headers, params=params)
+        return response.json()
+
+    def mk_json_file(self, file_data_with_url):
+        file_data_without_url = []
+        for i in range(0, self.number_of_photos):
+            file_data_without_url.append({"file_name": f'{file_data_with_url[i]["name"]}.jpg',
+                                          "size": file_data_with_url[i]["size"]})
+        file = open("info.json", "w")
+        json.dump(file_data_without_url, file, ensure_ascii=False, indent=2)
+        file.close()
+
+    def upload_json_file(self, path, file_data_with_url):
+        self.mk_json_file(file_data_with_url)
+        response_dict = self._get_upload_url(path)
+        upload_file_url = response_dict.get("href", "")
+        with open("info.json", 'rb') as upload_file:
+            response = requests.put(upload_file_url, files={"file": upload_file})
+            response.raise_for_status()
+            if response.status_code == 201:
+                print('\r\nJson file created')
+
+        return response.json
+
     def upload(self, id_user):
-        upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
+        """Uploading files to yandex.disk"""
         url_photo = vk.get_photo()
         headers = self.get_headers()
         path = {"path": f"photo_{id_user}"}
         self.mk_dir(path).raise_for_status()
-        # bar = IncrementalBar('Upload', max=len(url_photo))
-        # print(len(url_photo))
-        # return 'done'
-        for item in tqdm(url_photo):
-            params = {"path": f"{path['path']}/{item['name']}.jpg", "url": f"{item['url']}"}
-            response = requests.post(upload_url, headers=headers, params=params)
+        self.upload_json_file(path, url_photo)
+        for i in tqdm(range(0, self.number_of_photos)):
+            params = {"path": f"{path['path']}/{url_photo[i]['name']}.jpg", "url": f"{url_photo[i]['url']}"}
+            response = requests.post(self.upload_url, headers=headers, params=params)
             response.raise_for_status()
             time.sleep(1)
-        # for file_name, file_path in tqdm(url_photo.items()):
-        #     params = {"path": f"photo/{file_name}.jpg", "url": f"{file_path}", "overwrite": "true"}
-        #     response = requests.post(upload_url, headers=headers, params=params)
-        #     response.raise_for_status()
-        #     # print(response.status_code)
-        #     # if response.status_code == 202:
-        #     #     print('Status: OK')
-        #     # bar.next()
-        #     time.sleep(1)
-        # # bar.finish()
         return '\n Done'
 
 
@@ -103,18 +120,17 @@ def get_access():
     get_access_key = {
         'access_token': get_token_id_from_file('token'),
         'user_id': get_token_id_from_file('id'),
-        'ya_token': get_token_id_from_file('yatoken')
+        'ya_token': get_token_id_from_file('yatoken'),
+        'number_of_photos': 5
     }
     return get_access_key
 
 
 if __name__ == '__main__':
     access_key = get_access()
-    # print(access_key)
     vk = VK(access_key['access_token'], access_key['user_id'])
     user = vk.users_info()
-    # print(user)
     print(f"User: {user['response'][0]['first_name']} {user['response'][0]['last_name']}")
-    uploader = YaUploader(access_key['ya_token'])
+    uploader = YaUploader(access_key['ya_token'], access_key['number_of_photos'])
     result = uploader.upload(access_key['user_id'])
     print(result)
