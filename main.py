@@ -2,7 +2,6 @@ import requests
 import time
 from tqdm import tqdm
 import json
-from pprint import pprint
 
 
 class VK:
@@ -45,7 +44,7 @@ class VK:
 
 
 class YaUploader:
-    def __init__(self, token: str, number_of_photos):
+    def __init__(self, token: str, number_of_photos=5):
         self.token = token
         self.upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
         self.number_of_photos = number_of_photos
@@ -95,11 +94,18 @@ class YaUploader:
 
         return response.json
 
+    def checking_range(self, url_photo):
+        if self.number_of_photos > len(url_photo):
+            return len(url_photo)
+        else:
+            return self.number_of_photos
+
     def upload(self, id_user):
         """Uploading files to yandex.disk"""
         url_photo = vk.get_photo()
         headers = self.get_headers()
         path = {"path": f"photo_{id_user}"}
+        self.number_of_photos = self.checking_range(url_photo)
         self.mk_dir(path).raise_for_status()
         self.upload_json_file(path, url_photo)
         for i in tqdm(range(0, self.number_of_photos)):
@@ -110,19 +116,14 @@ class YaUploader:
         return '\n Done'
 
 
-def get_token_id_from_file(file_name):
-    with open(f'{file_name}.txt', "r") as file:
-        token_id = file.read()
-    return token_id
-
-
 def get_access():
     get_access_key = {
-        'access_token': get_token_id_from_file('token'),
-        'user_id': get_token_id_from_file('id'),
-        'ya_token': get_token_id_from_file('yatoken'),
-        'number_of_photos': 5
+        'access_token': input('Enter VK access token: '),
+        'user_id': input('Enter VK user ID: '),
+        'ya_token': input('Enter Yandex token: '),
+        'number_of_photos': int(input('Enter number of photos: '))
     }
+
     return get_access_key
 
 
